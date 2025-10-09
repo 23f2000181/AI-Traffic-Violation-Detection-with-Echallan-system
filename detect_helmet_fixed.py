@@ -2,15 +2,26 @@ from ultralytics import YOLO
 import cv2
 import os
 from pathlib import Path
+import easyocr
+from pymongo import MongoClient
+from datetime import datetime
 
-def detect_helmets(image_path=None, video_path=None, output_dir="outputs"):
+def detect_helmets(image_path=None, video_path=None, output_dir="outputs", confidence=0.5):
     """Detect helmets in images or videos using trained YOLO model"""
 
     # Create output directory
     os.makedirs(output_dir, exist_ok=True)
 
+    # Initialize EasyOCR reader
+    reader = easyocr.Reader(['en'])
+
+    # Initialize MongoDB client (using port 27018 to avoid conflicts with other projects)
+    client = MongoClient("mongodb://localhost:27018/")
+    db = client["helmet_detection_db"]
+    collection = db["detections"]
+
     # Load the trained model (or use pre-trained if no trained model exists)
-    model_path = "runs/detect/helmet_detection/weights/best.pt"
+    model_path = "runs/detect/helmet_detection_fixed/weights/best.pt"
     if os.path.exists(model_path):
         print(f"📱 Loading trained model: {model_path}")
         model = YOLO(model_path)
@@ -18,12 +29,22 @@ def detect_helmets(image_path=None, video_path=None, output_dir="outputs"):
         print("⚠️  Trained model not found, using pre-trained YOLOv8n")
         model = YOLO("yolov8n.pt")
 
+    def save_detection_to_db(detection_data):
+        try:
+            collection.insert_one(detection_data)
+            print("💾 Detection data saved to MongoDB")
+        except Exception as e:
+            print(f"❌ Failed to save to MongoDB: {e}")
+
     # Process image
     if image_path:
         print(f"🖼️  Processing image: {image_path}")
 
+        # Read image
+        img = cv2.imread(image_path)
+
         # Run detection
-        results = model(image_path, conf=0.5)  # Confidence threshold
+        results = model(image_path, conf=confidence)  # Confidence threshold
 
         # Process results
         for i, result in enumerate(results):
@@ -32,6 +53,13 @@ def detect_helmets(image_path=None, video_path=None, output_dir="outputs"):
             result.save(filename=output_path)
 
             print(f"✅ Detection saved to: {output_path}")
+
+            # Prepare data for DB
+            detection_data = {
+                "timestamp": datetime.now(),
+                "image_path": output_path,
+                "detections": []
+            }
 
             # Print detection info
             boxes = result.boxes
@@ -43,6 +71,29 @@ def detect_helmets(image_path=None, video_path=None, output_dir="outputs"):
                     class_name = result.names[cls]
                     print(f"   - {class_name}: {conf:.2f} confidence")
 
+                    # Crop license plate and run OCR
+                    if class_name == "Vehicle_registration_plate":
+                        # Get bounding box coordinates
+                        xyxy = box.xyxy[0].cpu().numpy().astype(int)
+                        x1, y1, x2, y2 = xyxy
+                        cropped_plate = img[y1:y2, x1:x2]
+
+                        # OCR on cropped plate
+                        ocr_result = reader.readtext(cropped_plate)
+                        plate_text = " ".join([res[1] for res in ocr_result]) if ocr_result else "N/A"
+                        print(f"   🔍 OCR License Plate Text: {plate_text}")
+
+                        detection_data["detections"].append({
+                            "class": class_name,
+                            "confidence": conf,
+                            "plate_text": plate_text
+                        })
+                    else:
+                        detection_data["detections"].append({
+                            "class": class_name,
+                            "confidence": conf
+                        })
+
                     # Color coding: Green for Helmet, Red for NoHelmet
                     if class_name == "Helmet":
                         print("   🟢 Helmet detected!")
@@ -50,6 +101,9 @@ def detect_helmets(image_path=None, video_path=None, output_dir="outputs"):
                         print("   🔴 No helmet detected!")
             else:
                 print("❌ No objects detected")
+
+            # Save detection data to MongoDB
+            save_detection_to_db(detection_data)
 
     # Process video
     elif video_path:
