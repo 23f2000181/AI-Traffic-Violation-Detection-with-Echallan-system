@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Helmet Detection System{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h1>Welcome to Helmet Detection System</h1>
+            </div>
+            <div class="card-body">
+                <p>This system detects helmets in uploaded images using AI and manages traffic violations.</p>
+                <div class="row">
+                    <div class="col-md-4">
+                        <a href="/upload" class="btn btn-primary btn-lg w-100">Upload Image</a>
+                    </div>
+                    <div class="col-md-4">
+                        <a href="/data" class="btn btn-secondary btn-lg w-100">View Data</a>
+                    </div>
+                    <div class="col-md-4">
+                        <button class="btn btn-info btn-lg w-100" onclick="location.reload()">Refresh</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

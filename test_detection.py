@@ -3,7 +3,7 @@
 Test script for helmet detection with custom confidence threshold
 """
 
-from detect_helmet_fixed import detect_helmets
+from detect_helmet import detect_helmets
 
 def test_helmet_detection():
     """Test helmet detection on sample images with different confidence levels"""

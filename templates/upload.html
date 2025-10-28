@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Image - Helmet Detection System{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <h2>Upload Image for Helmet Detection</h2>
+            </div>
+            <div class="card-body">
+                <form action="/upload" method="post" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="image" class="form-label">Select Image</label>
+                        <input type="file" class="form-control" id="image" name="image" accept="image/*" required>
+                    </div>
+                    <button type="submit" class="btn btn-success">Process Image</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

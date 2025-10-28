@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}View Data - Helmet Detection System{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h2>System Data</h2>
+            </div>
+            <div class="card-body">
+                <ul class="nav nav-tabs" id="dataTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="challans-tab" data-bs-toggle="tab" data-bs-target="#challans" type="button" role="tab">Challans</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="violations-tab" data-bs-toggle="tab" data-bs-target="#violations" type="button" role="tab">Violations</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="owners-tab" data-bs-toggle="tab" data-bs-target="#owners" type="button" role="tab">Owners</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="vehicles-tab" data-bs-toggle="tab" data-bs-target="#vehicles" type="button" role="tab">Vehicles</button>
+                    </li>
+                </ul>
+                <div class="tab-content mt-3" id="dataTabsContent">
+                    <div class="tab-pane fade show active" id="challans" role="tabpanel">
+                        <h4>Challans</h4>
+                        {% if challans %}
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Challan No</th>
+                                    <th>Vehicle No</th>
+                                    <th>Total Penalty</th>
+                                    <th>Status</th>
+                                    <th>Issued At</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for c in challans %}
+                                <tr>
+                                    <td>{{ c.challan_no }}</td>
+                                    <td>{{ c.vehicle_no }}</td>
+                                    <td>INR {{ c.total_penalty }}</td>
+                                    <td>{{ c.status }}</td>
+                                    <td>{{ c.issued_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <p>No challans found.</p>
+                        {% endif %}
+                    </div>
+                    <div class="tab-pane fade" id="violations" role="tabpanel">
+                        <h4>Violations</h4>
+                        {% if violations %}
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Source</th>
+                                    <th>Vehicle No</th>
+                                    <th>Detection</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for v in violations %}
+                                <tr>
+                                    <td>{{ v.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>{{ v.source }}</td>
+                                    <td>{{ v.vehicle_no or 'N/A' }}</td>
+                                    <td>{{ v.detection }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <p>No violations found.</p>
+                        {% endif %}
+                    </div>
+                    <div class="tab-pane fade" id="owners" role="tabpanel">
+                        <h4>Owners</h4>
+                        {% if owners %}
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Owner ID</th>
+                                    <th>Name</th>
+                                    <th>Phone</th>
+                                    <th>Email</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for o in owners %}
+                                <tr>
+                                    <td>{{ o.owner_id }}</td>
+                                    <td>{{ o.name }}</td>
+                                    <td>{{ o.phone }}</td>
+                                    <td>{{ o.email }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <p>No owners found.</p>
+                        {% endif %}
+                    </div>
+                    <div class="tab-pane fade" id="vehicles" role="tabpanel">
+                        <h4>Vehicles</h4>
+                        {% if vehicles %}
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Vehicle No</th>
+                                    <th>Owner ID</th>
+                                    <th>Make</th>
+                                    <th>Model</th>
+                                    <th>Color</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for v in vehicles %}
+                                <tr>
+                                    <td>{{ v.vehicle_no }}</td>
+                                    <td>{{ v.owner_id }}</td>
+                                    <td>{{ v.make }}</td>
+                                    <td>{{ v.model }}</td>
+                                    <td>{{ v.color }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <p>No vehicles found.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

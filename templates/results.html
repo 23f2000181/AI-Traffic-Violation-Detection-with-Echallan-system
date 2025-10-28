@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Detection Results - Helmet Detection System{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h2>Detection Results</h2>
+            </div>
+            <div class="card-body">
+                {% if image_path %}
+                <div class="mb-3">
+                    <img src="{{ image_path }}" alt="Processed Image" class="img-fluid">
+                </div>
+                {% endif %}
+                <h4>Detections:</h4>
+                {% if detections %}
+                <ul class="list-group">
+                    {% for det in detections %}
+                    <li class="list-group-item">
+                        <strong>{{ det.class }}</strong> - Confidence: {{ "%.2f"|format(det.confidence) }}
+                        {% if det.plate_text %}
+                        <br>License Plate: {{ det.plate_text }}
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p>No detections found.</p>
+                {% endif %}
+                {% if challan %}
+                <div class="alert alert-warning mt-3">
+                    <h5>Challan Created</h5>
+                    <p>Challan No: {{ challan.challan_no }}</p>
+                    <p>Vehicle: {{ challan.vehicle_no }}</p>
+                    <p>Total Penalty: INR {{ challan.total_penalty }}</p>
+                </div>
+                {% endif %}
+                <a href="/upload" class="btn btn-primary">Upload Another Image</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
