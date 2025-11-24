@@ -1,0 +1,28 @@
+{
+    "models": {
+        "license_plate": "D:/Codes/Miniproj/license_plate_detection/models/best.pt",
+        "helmet": "runs/detect/helmet_detection/weights/best.pt",
+        "red_light": {
+            "model": "D:/Codes/Miniproj/models/traffic_light_classifier.h5",
+            "class_names": "D:/Codes/Miniproj/models/class_names.json"
+        }
+    },
+    "output_dirs": {
+        "license_plates": "results/license_plates",
+        "helmets": "results/helmet_detection",
+        "red_light": "results/red_light_violations",
+        "combined": "results/combined"
+    },
+    "confidence_thresholds": {
+        "license_plate": 0.5,
+        "helmet": 0.25,
+        "red_light": 0.7
+    },
+    "violation_settings": {
+        "stop_line": {
+            "start": [100, 400],
+            "end": [600, 400]
+        },
+        "traffic_light_roi": [50, 50, 100, 200]
+    }
+}
