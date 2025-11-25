@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:latest
+    container_name: traffic_violation_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=traffic_violations
+    networks:
+      - app_network
+
+  # Flask Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: traffic_violation_backend
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./processed:/app/processed
+      - ./results:/app/results
+      - ./config.json:/app/config.json
+      - ./models:/app/models
+      - ./runs:/app/runs
+      - ./license_plate_detection:/app/license_plate_detection
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017
+      - FLASK_ENV=production
+    depends_on:
+      - mongodb
+    networks:
+      - app_network
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: traffic_violation_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - app_network
+
+volumes:
+  mongodb_data:
+
+networks:
+  app_network:
+    driver: bridge
