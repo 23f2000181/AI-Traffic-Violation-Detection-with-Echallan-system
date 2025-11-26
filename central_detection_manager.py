@@ -327,20 +327,20 @@ class CentralDetectionManager:
             "models": {
                 "license_plate": "D:/Codes/Miniproj/license_plate_detection/models/best.pt",
                 "helmet": "D:/Codes/Miniproj/runs/detect/helmet_detection/weights/best.pt",
-                "triple_riding": "D:/Codes/Miniproj/triple_riding/best.pt"  # ✅ Your triple riding model
+                "triple_riding": "D:/Codes/Miniproj/triple_riding/yolov8n.pt"  # ✅ Using standard YOLOv8n model
             },
             "output_dirs": {
                 "license_plates": "results/license_plates",
                 "helmets": "results/helmet_detection",
                 "red_light": "results/red_light_violations",
-                "triple_riding": "results/triple_riding",  # ✅ Add this output directory
+                "triple_riding": "results/triple_riding",
                 "combined": "results/combined"
             },
             "confidence_thresholds": {
                 "license_plate": 0.5,
                 "helmet": 0.25,
                 "red_light": 0.3,
-                "triple_riding": 0.4  # ✅ Add confidence threshold
+                "triple_riding": 0.4
             },
             "violation_settings": {
                 "stop_line": {
@@ -425,8 +425,8 @@ class CentralDetectionManager:
                 bbox = lp['bbox']
                 text = lp['plate_text']
                 x1, y1, x2, y2 = bbox
-                cv2.rectangle(annotated_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                cv2.putText(annotated_image, text, (x1, y1-10), 
+                cv2.rectangle(annotated_image, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                cv2.putText(annotated_image, text, (int(x1), int(y1-10)), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
         
         # Helmet Detection
@@ -434,11 +434,29 @@ class CentralDetectionManager:
             print("\n🛵 Processing Helmet Detection...")
             helmet_results = self.detect_helmets(image_path, image)
             results['helmets'] = helmet_results
+            results['helmet_violations'] = getattr(self, 'helmet_violations_cache', [])
+    
+            # Annotate helmet detections on image
+            for helmet in helmet_results:
+                bbox = helmet.get('bbox')
+                class_name = helmet.get('class', '')
+                confidence = helmet.get('confidence', 0.0)
         
-        # Triple Riding Detection
+                if bbox and len(bbox) == 4:
+                    x1, y1, x2, y2 = bbox
+                    # Use red for violations, green for proper helmets
+                    color = (0, 0, 255) if class_name.lower() in ["nohelmet", "without_helmet", "no_helmet"] else (0, 255, 0)
+                    thickness = 3 if class_name.lower() in ["nohelmet", "without_helmet", "no_helmet"] else 2
+            
+                    cv2.rectangle(annotated_image, (int(x1), int(y1)), (int(x2), int(y2)), color, thickness)
+                    label = f"{class_name} {confidence:.2f}"
+                    cv2.putText(annotated_image, label, (int(x1), int(y1-10)), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+        
+        # Triple Riding Detection - USING BALANCED LOGIC
         if 'triple_riding' in detection_types:
             print("\n🏍️  Processing Triple Riding Detection...")
-            triple_riding_results = self.detect_triple_riding(image, annotated_image)
+            triple_riding_results = self.detect_triple_riding_balanced(image, annotated_image)
             results['triple_riding_violations'] = triple_riding_results
         
         # Red Light Violation Detection
@@ -497,136 +515,170 @@ class CentralDetectionManager:
             return []
     
     def detect_helmets(self, image_path, image):
-        """Detect helmets using the helmet detection module"""
+        """Detect helmets using the actual helmet detection module with custom logic"""
         try:
+            print(f"🔍 [HELMET] Calling actual detect_helmets function...")
+        
+            # Call your actual function with proper parameters
             results = detect_helmets(
                 image_path=image_path,
-                output_dir=self.config["output_dirs"]["helmets"]
+                output_dir=self.config["output_dirs"]["helmets"],
+                confidence=self.config["confidence_thresholds"]["helmet"]
             )
-            return results if results else []
-        except Exception as e:
-            print(f"❌ Helmet detection error: {e}")
-            return []
-    
-    def detect_triple_riding(self, image, annotated_image):
-        """Detect triple riding violations"""
-        try:
-            print("🏍️  Detecting triple riding violations...")
-            
-            # Run YOLO detection
-            results = self.triple_riding_model(image)
-            
-            violations = []
-            
-            for result in results:
-                persons = []
-                motorbikes = []
+        
+            print(f"🔍 [HELMET] Raw results from detect_helmets: {results}")
+        
+            # Return ALL detections for drawing, but also identify violations
+            all_detections = []
+            helmet_violations = []
+        
+            if results:
+                for detection in results:
+                    class_name = detection.get('class', '').lower()
                 
-                for box in result.boxes:
-                    cls = int(box.cls.item())
-                    confidence = float(box.conf[0].cpu().numpy())
-                    bbox = box.xyxy[0].cpu().numpy().astype(int)
-                    
-                    # ✅ CORRECT CLASS IDs FOR YOUR MODEL:
-                    # 0 = person, 1 = motorbike
-                    if cls == 0:  # Person
-                        persons.append({
-                            'bbox': bbox.tolist(),
-                            'confidence': confidence
-                        })
-                    elif cls == 1:  # Motorbike
-                        motorbikes.append({
-                            'bbox': bbox.tolist(),
-                            'confidence': confidence
-                        })
+                    # Add to all detections for drawing
+                    all_detections.append(detection)
                 
-                # Check for triple riding: 3+ persons near a motorbike
-                for motorbike in motorbikes:
-                    mb_bbox = motorbike['bbox']
-                    mb_x1, mb_y1, mb_x2, mb_y2 = mb_bbox
-                    
-                    # Count persons near this motorbike
-                    persons_on_bike = []
-                    
-                    for person in persons:
-                        p_bbox = person['bbox']
-                        
-                        # Check if person overlaps or is near the motorbike
-                        if self.is_person_on_motorbike(p_bbox, mb_bbox):
-                            persons_on_bike.append(person)
-                    
-                    # Triple riding = 3 or more persons on one motorbike
-                    if len(persons_on_bike) >= 3:
-                        violation = {
-                            'type': 'triple_riding',
-                            'motorbike_bbox': mb_bbox,
-                            'person_count': len(persons_on_bike),
-                            'persons': persons_on_bike,
-                            'confidence': motorbike['confidence'],
+                    # Use YOUR custom logic from detect_helmet.py
+                    if class_name in ["nohelmet", "without_helmet", "no_helmet"]:
+                        print(f"🚨 HELMET VIOLATION DETECTED: {class_name}")
+                        helmet_violations.append({
+                            'class': detection.get('class', 'no_helmet'),
+                            'confidence': detection.get('confidence', 0.0),
+                            'bbox': detection.get('bbox', []),
+                            'type': 'helmet_violation',
                             'timestamp': datetime.now().isoformat()
-                        }
-                        violations.append(violation)
-                        
-                        print(f"🚨 Triple riding detected! {len(persons_on_bike)} persons on motorbike")
-                        
-                        # Draw on annotated image
-                        cv2.rectangle(annotated_image, (mb_x1, mb_y1), (mb_x2, mb_y2), (0, 0, 255), 3)
-                        cv2.putText(annotated_image, f"TRIPLE RIDING ({len(persons_on_bike)} persons)", 
-                                  (mb_x1, mb_y1-10), 
-                                  cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-                        
-                        # Draw person bounding boxes
-                        for person in persons_on_bike:
-                            px1, py1, px2, py2 = person['bbox']
-                            cv2.rectangle(annotated_image, (px1, py1), (px2, py2), (255, 0, 0), 2)
-            
-            print(f"✅ Triple riding violations found: {len(violations)}")
-            return violations
-            
+                        })
+                    elif class_name == "helmet":
+                        print(f"✅ Helmet detected (no violation): {class_name}")
+        
+            print(f"✅ [HELMET] Found {len(all_detections)} total detections, {len(helmet_violations)} violations")
+        
+            # Store violations separately for the results
+            self.helmet_violations_cache = helmet_violations
+        
+            return all_detections  # Return all for drawing
+        
         except Exception as e:
-            print(f"❌ Triple riding detection error: {e}")
+            print(f"❌ [HELMET] Error in helmet detection: {e}")
             import traceback
             traceback.print_exc()
             return []
     
-    def is_person_on_motorbike(self, person_bbox, motorbike_bbox):
-        """
-        Check if a person is on/near a motorbike using IoU and proximity
-        """
-        p_x1, p_y1, p_x2, p_y2 = person_bbox
-        m_x1, m_y1, m_x2, m_y2 = motorbike_bbox
-        
-        # Calculate intersection
-        inter_x1 = max(p_x1, m_x1)
-        inter_y1 = max(p_y1, m_y1)
-        inter_x2 = min(p_x2, m_x2)
-        inter_y2 = min(p_y2, m_y2)
-        
-        if inter_x2 < inter_x1 or inter_y2 < inter_y1:
-            # No overlap - check proximity
-            p_center_x = (p_x1 + p_x2) / 2
-            p_center_y = (p_y1 + p_y2) / 2
-            m_center_x = (m_x1 + m_x2) / 2
-            m_center_y = (m_y1 + m_y2) / 2
+    def detect_triple_riding_balanced(self, image, annotated_image):
+        """Detect triple riding violations using balanced approach"""
+        try:
+            print("🏍️  Running balanced triple riding detection...")
             
-            # Check if person is within reasonable distance
-            distance = ((p_center_x - m_center_x)**2 + (p_center_y - m_center_y)**2)**0.5
-            m_width = m_x2 - m_x1
+            # Run detection with confidence threshold
+            results = self.triple_riding_model(image, conf=0.5)
             
-            # Person should be within 1.5x motorbike width
-            return distance < (m_width * 1.5)
+            violations = []
+            
+            for result in results:
+                boxes = result.boxes.xyxy.cpu().numpy()
+                class_ids = result.boxes.cls.cpu().numpy().astype(int)
+                confidences = result.boxes.conf.cpu().numpy()
+                
+                motorcycles = []
+                persons = []
+                
+                # ✅ FIXED: Correct class IDs for YOLOv8n COCO dataset
+                for i, cls_id in enumerate(class_ids):
+                    if cls_id == 3:  # ✅ FIXED: motorcycle in YOLO COCO (was 1)
+                        motorcycles.append({
+                            'bbox': boxes[i].tolist(),  # ✅ Convert numpy array to list
+                            'confidence': float(confidences[i])  # ✅ Convert to Python float
+                        })
+                    elif cls_id == 0:  # ✅ person in YOLO COCO (correct)
+                        persons.append({
+                            'bbox': boxes[i].tolist(),  # ✅ Convert numpy array to list
+                            'confidence': float(confidences[i])  # ✅ Convert to Python float
+                        })
+                
+                print(f"🔍 Found {len(motorcycles)} motorcycles and {len(persons)} persons")
+                
+                # Triple riding analysis using balanced logic
+                for i, moto in enumerate(motorcycles):
+                    # ✅ Convert bbox to list and extract coordinates
+                    moto_bbox = moto['bbox']
+                    mx1, my1, mx2, my2 = moto_bbox
+                    moto_width = mx2 - mx1
+                    moto_height = my2 - my1
+                    
+                    # Count likely riders using balanced criteria
+                    riders = []
+                    rider_boxes = []
+                    
+                    for person in persons:
+                        person_bbox = person['bbox']
+                        px1, py1, px2, py2 = person_bbox
+                        person_center_x = (px1 + px2) / 2
+                        person_center_y = (py1 + py2) / 2
+                        
+                        moto_center_x = (mx1 + mx2) / 2
+                        
+                        # Balanced criteria for rider detection
+                        horizontal_bound = moto_width * 0.8  # 80% wider than bike
+                        vertical_upper_bound = my1 - moto_height * 0.2  # Allow some above
+                        vertical_lower_bound = my2 + moto_height * 0.3  # Allow some below
+                        
+                        if (moto_center_x - horizontal_bound <= person_center_x <= moto_center_x + horizontal_bound and
+                            vertical_upper_bound <= person_center_y <= vertical_lower_bound):
+                            
+                            riders.append(person)
+                            rider_boxes.append(person_bbox)  # Already converted to list
+                    
+                    rider_count = len(riders)
+                    
+                    # Log detection status
+                    status = "✅ Single rider"
+                    if rider_count == 2:
+                        status = "⚠️ Double riding"
+                    elif rider_count >= 3:
+                        status = "🚨 TRIPLE RIDING DETECTED!"
+                        
+                        violation = {
+                            'type': 'triple_riding',
+                            'motorbike_bbox': moto_bbox,  # Already converted to list
+                            'person_count': rider_count,
+                            'persons': riders,
+                            'rider_boxes': rider_boxes,  # Already converted to list
+                            'confidence': moto['confidence'],
+                            'timestamp': datetime.now().isoformat()
+                        }
+                        violations.append(violation)
+                        
+                        print(f"🚨 TRIPLE RIDING! Motorcycle {i+1} has {rider_count} riders")
+                        
+                        # ✅ FIXED: Convert bbox coordinates to integers for OpenCV
+                        cv2.rectangle(annotated_image, 
+                                    (int(mx1), int(my1)), 
+                                    (int(mx2), int(my2)), 
+                                    (0, 0, 255), 3)
+                        cv2.putText(annotated_image, f"TRIPLE RIDING ({rider_count} people)", 
+                                  (int(mx1), int(my1-10)), 
+                                  cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                        
+                        # ✅ FIXED: Convert rider bbox coordinates to integers for OpenCV
+                        for rider_bbox in rider_boxes:
+                            rx1, ry1, rx2, ry2 = rider_bbox
+                            cv2.rectangle(annotated_image, 
+                                        (int(rx1), int(ry1)), 
+                                        (int(rx2), int(ry2)), 
+                                        (255, 0, 0), 2)
+                    
+                    print(f"   Motorcycle {i+1}: {rider_count} rider(s) - {status}")
         
-        # Calculate IoU
-        inter_area = (inter_x2 - inter_x1) * (inter_y2 - inter_y1)
-        p_area = (p_x2 - p_x1) * (p_y2 - p_y1)
-        m_area = (m_x2 - m_x1) * (m_y2 - m_y1)
-        union_area = p_area + m_area - inter_area
-        
-        iou = inter_area / union_area if union_area > 0 else 0
-        
-        # Consider person on bike if IoU > 0.1 or significant overlap
-        return iou > 0.1
-
+            print(f"✅ Balanced triple riding detection complete. Violations found: {len(violations)}")
+            return violations
+            
+        except Exception as e:
+            print(f"❌ Balanced triple riding detection error: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+    
     def detect_red_light_violations(self, image, annotated_image):
         """Detect red light violations using enhanced approach"""
         try:
@@ -639,8 +691,8 @@ class CentralDetectionManager:
             for violation in violations:
                 bbox = violation['bbox']
                 x1, y1, x2, y2 = bbox
-                cv2.rectangle(annotated_image, (x1, y1), (x2, y2), (0, 0, 255), 3)
-                cv2.putText(annotated_image, "RED LIGHT VIOLATION", (x1, y1-10), 
+                cv2.rectangle(annotated_image, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 3)
+                cv2.putText(annotated_image, "RED LIGHT VIOLATION", (int(x1), int(y1-10)), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
             
             return violations
@@ -650,13 +702,28 @@ class CentralDetectionManager:
             return []
     
     def combine_results(self, results, timestamp):
-        """Combine results from all detection systems"""
+        """Combine results from all detection systems - ensure JSON serializable"""
+        # Helper function to make sure all data is JSON serializable
+        def make_json_serializable(obj):
+            if isinstance(obj, (np.integer, np.int64)):
+                return int(obj)
+            elif isinstance(obj, (np.floating, np.float32, np.float64)):
+                return float(obj)
+            elif isinstance(obj, np.ndarray):
+                return obj.tolist()
+            elif isinstance(obj, dict):
+                return {k: make_json_serializable(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [make_json_serializable(item) for item in obj]
+            else:
+                return obj
+        
         combined = {
             "timestamp": timestamp,
-            "license_plates": results.get('license_plates', []),
-            "helmet_violations": results.get('helmets', []),
-            "triple_riding_violations": results.get('triple_riding_violations', []),
-            "red_light_violations": results.get('red_light_violations', []),
+            "license_plates": make_json_serializable(results.get('license_plates', [])),
+            "helmet_violations": make_json_serializable(results.get('helmets', [])),
+            "triple_riding_violations": make_json_serializable(results.get('triple_riding_violations', [])),
+            "red_light_violations": make_json_serializable(results.get('red_light_violations', [])),
             "preprocessing_applied": self.config["preprocessing"]["apply_binary_preprocessing"],
             "summary": {
                 "total_license_plates": len(results.get('license_plates', [])),

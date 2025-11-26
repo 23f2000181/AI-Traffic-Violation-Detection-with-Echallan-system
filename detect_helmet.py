@@ -24,7 +24,7 @@ def detect_helmets(image_path=None, video_path=None, output_dir="outputs", confi
     collection = db["detections"]
 
     # Load the trained model (or use pre-trained if not found)
-    model_path = "runs/detect/helmet_detection/weights/best.pt"
+    model_path = "D:/Codes/Miniproj/runs/detect/helmet_detection/weights/best.pt"
     if os.path.exists(model_path):
         print(f"📱 Loading trained model: {model_path}")
         model = YOLO(model_path)
@@ -45,6 +45,9 @@ def detect_helmets(image_path=None, video_path=None, output_dir="outputs", confi
             print(f"📤 Sent detection to Flask: {r.json()}")
         except Exception as e:
             print(f"❌ Failed to send to Flask: {e}")
+
+    # ✅ COLLECT ALL DETECTIONS TO RETURN
+    all_detections = []
 
     # Process image
     if image_path:
@@ -74,6 +77,7 @@ def detect_helmets(image_path=None, video_path=None, output_dir="outputs", confi
                     cls = int(box.cls.item())
                     conf = box.conf.item()
                     class_name = result.names[cls]
+                    bbox = box.xyxy[0].cpu().numpy().astype(int).tolist()
                     print(f"   - {class_name}: {conf:.2f} confidence")
 
                     # OCR if license plate detected
@@ -85,16 +89,23 @@ def detect_helmets(image_path=None, video_path=None, output_dir="outputs", confi
                         plate_text = " ".join([res[1] for res in ocr_result]) if ocr_result else "N/A"
                         print(f"   🔍 OCR License Plate Text: {plate_text}")
 
-                        detection_data["detections"].append({
+                        detection_item = {
                             "class": class_name,
                             "confidence": conf,
+                            "bbox": bbox,
                             "plate_text": plate_text
-                        })
+                        }
+                        detection_data["detections"].append(detection_item)
+                        all_detections.append(detection_item)
                     else:
-                        detection_data["detections"].append({
+                        detection_item = {
                             "class": class_name,
-                            "confidence": conf
-                        })
+                            "confidence": conf,
+                            "bbox": bbox,
+                            "type": class_name  # Add type field for compatibility
+                        }
+                        detection_data["detections"].append(detection_item)
+                        all_detections.append(detection_item)
 
                     # Detection summary
                     if class_name.lower() in ["helmet"]:
@@ -112,6 +123,10 @@ def detect_helmets(image_path=None, video_path=None, output_dir="outputs", confi
                     vehicle_no = det["plate_text"].replace(" ", "").upper()
                     break
             send_detection_to_flask(detection_data, vehicle_no)
+        
+        # ✅ RETURN THE DETECTIONS
+        print(f"🎯 Returning {len(all_detections)} helmet detections")
+        return all_detections
 
     elif video_path:
         print(f"🎥 Processing video: {video_path}")
@@ -119,7 +134,7 @@ def detect_helmets(image_path=None, video_path=None, output_dir="outputs", confi
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             print(f"❌ Error opening video: {video_path}")
-            return
+            return []
 
         frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -145,9 +160,11 @@ def detect_helmets(image_path=None, video_path=None, output_dir="outputs", confi
         cap.release()
         out.release()
         print(f"✅ Video processing completed: {output_video_path}")
+        return []  # Video processing doesn't return detections for now
 
     else:
         print("❌ Please provide either image_path or video_path")
+        return []
 
 
 def process_video(video_path, output_dir="outputs"):
@@ -163,4 +180,4 @@ def process_image(image_path, output_dir="outputs"):
 if __name__ == "__main__":
     print("🎯 Helmet Detection System")
     print("=" * 50)
-    detect_helmets(image_path="new.jpeg")
+    detect_helmets(image_path="detect2.jpg")

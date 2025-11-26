@@ -130,6 +130,7 @@ class Database:
                     '$project': {
                         'license_plate_count': {'$size': {'$ifNull': ['$detection_results.license_plates', []]}},
                         'helmet_count': {'$size': {'$ifNull': ['$detection_results.helmet_violations', []]}},
+                        'triple_riding_count': {'$size': {'$ifNull': ['$detection_results.triple_riding_violations', []]}},
                         'red_light_count': {'$size': {'$ifNull': ['$detection_results.red_light_violations', []]}}
                     }
                 },
@@ -138,6 +139,7 @@ class Database:
                         '_id': None,
                         'total_license_plates': {'$sum': '$license_plate_count'},
                         'total_helmet_violations': {'$sum': '$helmet_count'},
+                        'total_triple_riding_violations': {'$sum': '$triple_riding_count'},
                         'total_red_light_violations': {'$sum': '$red_light_count'}
                     }
                 }
@@ -147,6 +149,7 @@ class Database:
             stats = result[0] if result else {
                 'total_license_plates': 0,
                 'total_helmet_violations': 0,
+                'total_triple_riding_violations': 0,
                 'total_red_light_violations': 0
             }
             
@@ -165,6 +168,7 @@ class Database:
                 'total_violations': total_violations,
                 'license_plates': stats.get('total_license_plates', 0),
                 'helmet_violations': stats.get('total_helmet_violations', 0),
+                'triple_riding_violations': stats.get('total_triple_riding_violations', 0),
                 'red_light_violations': stats.get('total_red_light_violations', 0),
                 'recent_violations': recent
             }

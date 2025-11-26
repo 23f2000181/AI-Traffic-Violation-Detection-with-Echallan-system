@@ -1,7 +1,7 @@
 {
     "models": {
         "license_plate": "D:/Codes/Miniproj/license_plate_detection/models/best.pt",
-        "helmet": "runs/detect/helmet_detection/weights/best.pt",
+        "helmet": "D:/Codes/Miniproj/runs/detect/helmet_detection/weights/best.pt", 
         "triple_riding": "D:/Codes/Miniproj/triple_riding/best.pt",
         "red_light": {
             "model": "D:/Codes/Miniproj/models/traffic_light_classifier.h5",

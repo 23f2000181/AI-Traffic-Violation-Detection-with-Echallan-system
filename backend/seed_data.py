@@ -28,9 +28,9 @@ DATABASE_NAME = 'traffic_violations'
 SAMPLE_OWNERS = [
     {
         "owner_id": "OWN001",
-        "name": "Rajesh Kumar",
-        "phone": "+919627677684",
-        "email": "rajesh.kumar@example.com",
+        "name": "Aadita",
+        "phone": "+916901578022",
+        "email": "aadita@example.com",
         "address": "123 MG Road, Mumbai, Maharashtra 400001"
     },
     {

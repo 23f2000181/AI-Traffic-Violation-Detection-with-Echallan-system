@@ -47,7 +47,7 @@ class DetectionService:
             # Process image with all detection types
             results = self.manager.process_image(
                 image_path,
-                detection_types=['license_plate', 'helmet', 'red_light']
+                detection_types=['license_plate', 'helmet', 'triple_riding', 'red_light']
             )
             
             processing_time = time.time() - start_time
@@ -101,6 +101,7 @@ class DetectionService:
             # Extract detection data
             license_plates = results.get('license_plates', [])
             helmet_violations = results.get('helmet_violations', [])
+            triple_riding_violations = results.get('triple_riding_violations', [])
             red_light_violations = results.get('red_light_violations', [])
             
             # Format license plates
@@ -124,6 +125,18 @@ class DetectionService:
                         'timestamp': datetime.utcnow().isoformat()
                     })
             
+            # Format triple riding violations
+            formatted_triple_riding = []
+            for violation in triple_riding_violations:
+                if isinstance(violation, dict):
+                    formatted_triple_riding.append({
+                        'type': 'triple_riding',
+                        'person_count': violation.get('person_count', 0),
+                        'confidence': float(violation.get('confidence', 0.0)),
+                        'motorbike_bbox': violation.get('motorbike_bbox', []),
+                        'timestamp': violation.get('timestamp', datetime.utcnow().isoformat())
+                    })
+            
             # Format red light violations
             formatted_red_light = []
             for violation in red_light_violations:
@@ -144,6 +157,7 @@ class DetectionService:
                 'detection_results': {
                     'license_plates': formatted_lp,
                     'helmet_violations': formatted_helmets,
+                    'triple_riding_violations': formatted_triple_riding,
                     'red_light_violations': formatted_red_light
                 },
                 'processing_time': processing_time,

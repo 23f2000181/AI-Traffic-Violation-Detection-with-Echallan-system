@@ -1,0 +1,185 @@
+================================================================================
+          TRAFFIC VIOLATION DETECTION SYSTEM - COMPLETE FLOW
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         FRONTEND (React)                                 │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                    👤 User uploads image
+                                    │
+                                    ▼
+                    ┌───────────────────────────┐
+                    │  📤 UploadZone.jsx        │
+                    │  - Validates file         │
+                    │  - Shows preview          │
+                    └───────────────────────────┘
+                                    │
+                                    ▼
+                    ┌───────────────────────────┐
+                    │  🌐 API Call              │
+                    │  uploadImage(file)        │
+                    └───────────────────────────┘
+                                    │
+════════════════════════════════════╪════════════════════════════════════
+                                    │
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         BACKEND (Flask)                                  │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+                    ┌───────────────────────────┐
+                    │  🔌 POST /api/upload-image│
+                    │  app.py                   │
+                    └───────────────────────────┘
+                                    │
+                                    ▼
+                    ┌───────────────────────────┐
+                    │  💾 Save file             │
+                    │  uploads/timestamp_file   │
+                    └───────────────────────────┘
+                                    │
+                                    ▼
+                    ┌───────────────────────────┐
+                    │  🔄 Detection Service     │
+                    │  process_uploaded_image() │
+                    └───────────────────────────┘
+                                    │
+════════════════════════════════════╪════════════════════════════════════
+                                    │
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    DETECTION ENGINE (YOLO + OpenCV)                      │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+                    ┌───────────────────────────┐
+                    │  🎯 CentralDetectionManager│
+                    │  process_image()          │
+                    └───────────────────────────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    │                               │
+        ┌───────────▼──────────┐       ┌───────────▼──────────┐
+        │  🚗 License Plate    │       │  🛵 Helmet Detection │
+        │  Detection           │       │  - Helmet            │
+        │  - OCR Recognition   │       │  - NoHelmet          │
+        └──────────────────────┘       └──────────────────────┘
+                    │                               │
+                    └───────────────┬───────────────┘
+                                    │
+        ┌───────────▼──────────┐       ┌───────────▼──────────┐
+        │  🏍️ TRIPLE RIDING    │       │  🚦 Red Light        │
+        │  ✅ DETECTION        │       │  Violation           │
+        │  - YOLOv8n Model     │       │  - Stop line check   │
+        │  - Class 0: Person   │       │  - Traffic light AI  │
+        │  - Class 3: Motorcycle│      └──────────────────────┘
+        │  - Count >= 3 = ⚠️   │                   │
+        └──────────────────────┘                   │
+                    │                               │
+                    └───────────────┬───────────────┘
+                                    │
+                                    ▼
+                    ┌───────────────────────────┐
+                    │  📝 Format Results        │
+                    │  - Convert to JSON        │
+                    │  - Add timestamps         │
+                    │  - Format bboxes          │
+                    └───────────────────────────┘
+                                    │
+════════════════════════════════════╪════════════════════════════════════
+                                    │
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         DATABASE (MongoDB)                               │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+                    ┌───────────────────────────┐
+                    │  💾 Save to MongoDB       │
+                    │  violations collection    │
+                    └───────────────────────────┘
+                                    │
+════════════════════════════════════╪════════════════════════════════════
+                                    │
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         RESPONSE TO FRONTEND                             │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+                    ┌───────────────────────────┐
+                    │  📤 JSON Response         │
+                    │  {                        │
+                    │    success: true,         │
+                    │    results: {             │
+                    │      license_plates: [],  │
+                    │      helmet_violations:[],│
+                    │      triple_riding: [],   │
+                    │      red_light: []        │
+                    │    }                      │
+                    │  }                        │
+                    └───────────────────────────┘
+                                    │
+════════════════════════════════════╪════════════════════════════════════
+                                    │
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         FRONTEND DISPLAY                                 │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+                    ┌───────────────────────────┐
+                    │  📥 ResultsViewer.jsx     │
+                    │  - Summary cards          │
+                    │  - Original image         │
+                    │  - Processed image        │
+                    │  - Detection tables       │
+                    └───────────────────────────┘
+                                    │
+                                    ▼
+                    ┌───────────────────────────┐
+                    │  🎨 Display to User       │
+                    │  ✅ All violations shown  │
+                    └───────────────────────────┘
+
+================================================================================
+
+KEY COMPONENTS:
+
+📁 Files Involved:
+  Frontend:
+    - src/components/UploadZone.jsx
+    - src/components/ResultsViewer.jsx
+    - src/services/api.js
+  
+  Backend:
+    - backend/app.py (API endpoints)
+    - backend/detection_service.py (Service layer)
+    - backend/database.py (MongoDB operations)
+  
+  Detection:
+    - central_detection_manager.py (Main detection logic)
+    - detect_helmet.py (Helmet detection)
+    - license_plate_detection/ (License plate detection)
+
+🔧 Models Used:
+  - yolov8n.pt (Triple riding - base COCO model)
+  - best.pt (License plate - trained model)
+  - best.pt (Helmet - trained model)
+  - traffic_light_classifier.h5 (Red light - trained CNN)
+
+📊 Data Flow:
+  1. Image uploaded → Saved to uploads/
+  2. All 4 detections run in parallel
+  3. Results combined and formatted
+  4. Saved to MongoDB
+  5. Returned to frontend as JSON
+  6. Displayed in beautiful UI
+
+✅ TRIPLE RIDING DETECTION VERIFIED:
+  - Model: yolov8n.pt ✅
+  - Class IDs: 0=person, 3=motorcycle ✅
+  - Logic: Counts persons near motorcycles ✅
+  - Threshold: >= 3 persons = violation ✅
+  - Drawing: Red box on bike, blue on persons ✅
+  - Response: Included in JSON ✅
+  - Display: Shows in frontend table ✅
+
+================================================================================
