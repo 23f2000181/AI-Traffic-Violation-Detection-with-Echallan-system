@@ -52,6 +52,14 @@ const Navigation = () => {
                         </Link>
                     </li>
                     <li>
+                        <Link
+                            to="/echallans"
+                            className={`nav-link ${isActive('/echallans') ? 'active' : ''}`}
+                        >
+                            📄 E-Challans
+                        </Link>
+                    </li>
+                    <li>
                         <button
                             onClick={toggleTheme}
                             className="nav-link"

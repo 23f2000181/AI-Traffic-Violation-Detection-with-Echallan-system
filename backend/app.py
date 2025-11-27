@@ -86,13 +86,71 @@ def upload_image():
         
         print(f"✅ Violation created: {violation_id}")
         
-        # Format response
+        # Auto-generate e-challan if license plate detected
+        challan_generated = False
+        challan_info = None
+        
+        license_plates = results['detection_results'].get('license_plates', [])
+        has_violations = (
+            len(results['detection_results'].get('helmet_violations', [])) > 0 or
+            len(results['detection_results'].get('triple_riding_violations', [])) > 0 or
+            len(results['detection_results'].get('red_light_violations', [])) > 0
+        )
+        
+        if license_plates and has_violations:
+            # Get the first detected license plate
+            plate_text = license_plates[0].get('plate_text', '').strip()
+            
+            if plate_text:
+                print(f"🔍 Looking up vehicle: {plate_text}")
+                
+                # Lookup vehicle in database
+                vehicle_info = vehicle_service.lookup_vehicle(plate_text)
+                
+                if vehicle_info:
+                    print(f"✅ Vehicle found! Generating e-challan...")
+                    
+                    # Add violation_id to results for challan generation
+                    results['_id'] = violation_id
+                    
+                    # Generate challan
+                    try:
+                        challan = challan_service.generate_challan(results, vehicle_info)
+                        challan_generated = True
+                        challan_info = {
+                            'challan_no': challan['challan_no'],
+                            'total_penalty': challan['total_penalty'],
+                            'vehicle_no': challan['vehicle_no'],
+                            'owner_name': challan['owner_name']
+                        }
+                        
+                        # Send notification
+                        print(f"📱 Sending notification to owner...")
+                        challan['owner_phone'] = vehicle_info['owner']['phone']
+                        challan['owner_email'] = vehicle_info['owner'].get('email', '')
+                        
+                        notification_results = notification_service.send_challan_notification(
+                            challan, 
+                            methods=['sms']
+                        )
+                        
+                        print(f"✅ E-Challan generated and notification sent!")
+                        
+                    except Exception as e:
+                        print(f"⚠️ Error generating challan: {e}")
+                else:
+                    print(f"⚠️ Vehicle {plate_text} not found in database")
+        
+        # Format response - UPDATED: Include both helmet_detections and helmet_violations
         response_data = {
             'success': True,
             'violation_id': violation_id,
+            'challan_generated': challan_generated,
+            'challan_info': challan_info,
             'results': {
                 'license_plates': results['detection_results']['license_plates'],
-                'helmet_violations': results['detection_results']['helmet_violations'],
+                'helmet_detections': results['detection_results'].get('helmet_detections', []),  # All helmet detections
+                'helmet_violations': results['detection_results'].get('helmet_violations', []),  # Only actual violations
                 'triple_riding_violations': results['detection_results']['triple_riding_violations'],
                 'red_light_violations': results['detection_results']['red_light_violations'],
                 'processing_time': results['processing_time'],

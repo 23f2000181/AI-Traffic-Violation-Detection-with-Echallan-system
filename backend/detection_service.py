@@ -100,7 +100,8 @@ class DetectionService:
         try:
             # Extract detection data
             license_plates = results.get('license_plates', [])
-            helmet_violations = results.get('helmet_violations', [])
+            helmet_detections = results.get('helmet_detections', [])  # All helmet detections
+            helmet_violations = results.get('helmet_violations', [])  # Only no-helmet violations
             triple_riding_violations = results.get('triple_riding_violations', [])
             red_light_violations = results.get('red_light_violations', [])
             
@@ -114,11 +115,24 @@ class DetectionService:
                     'timestamp': datetime.utcnow().isoformat()
                 })
             
-            # Format helmet violations
-            formatted_helmets = []
+            # Format helmet detections (all detections for visualization)
+            formatted_helmet_detections = []
+            for helmet in helmet_detections:
+                if isinstance(helmet, dict):
+                    class_name = helmet.get('class', helmet.get('type', ''))
+                    formatted_helmet_detections.append({
+                        'type': class_name,
+                        'confidence': float(helmet.get('confidence', 0.0)),
+                        'bbox': helmet.get('bbox', []),
+                        'timestamp': datetime.utcnow().isoformat(),
+                        'is_violation': class_name.lower() in ['nohelmet', 'without_helmet', 'no_helmet']
+                    })
+            
+            # Format helmet violations (only actual violations)
+            formatted_helmet_violations = []
             for helmet in helmet_violations:
                 if isinstance(helmet, dict):
-                    formatted_helmets.append({
+                    formatted_helmet_violations.append({
                         'type': helmet.get('class', helmet.get('type', 'helmet_violation')),
                         'confidence': float(helmet.get('confidence', 0.0)),
                         'bbox': helmet.get('bbox', []),
@@ -156,7 +170,8 @@ class DetectionService:
                 'processed_image_path': processed_image_path,
                 'detection_results': {
                     'license_plates': formatted_lp,
-                    'helmet_violations': formatted_helmets,
+                    'helmet_detections': formatted_helmet_detections,  # All helmet detections
+                    'helmet_violations': formatted_helmet_violations,  # Only actual violations
                     'triple_riding_violations': formatted_triple_riding,
                     'red_light_violations': formatted_red_light
                 },

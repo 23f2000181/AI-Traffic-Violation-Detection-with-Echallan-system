@@ -17,6 +17,7 @@ class ChallanService:
     # Penalty amounts (in INR)
     PENALTIES = {
         "helmet_violation": 500,
+        "triple_riding_violation": 1000,
         "red_light_violation": 1000,
         "no_license_plate": 2000,
         "speeding": 1500,
@@ -70,6 +71,15 @@ class ChallanService:
                     'type': 'helmet_violation',
                     'penalty': self.PENALTIES['helmet_violation'],
                     'confidence': hv.get('confidence', 0)
+                })
+            
+            # Triple riding violations
+            for trv in violation_data.get('detection_results', {}).get('triple_riding_violations', []):
+                violations.append({
+                    'type': 'triple_riding_violation',
+                    'penalty': self.PENALTIES['triple_riding_violation'],
+                    'confidence': trv.get('confidence', 0),
+                    'person_count': trv.get('person_count', 0)
                 })
             
             # Red light violations

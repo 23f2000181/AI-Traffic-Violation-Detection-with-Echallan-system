@@ -118,6 +118,6 @@ def detect_single_image(model_path, image_path, save_dir="results"):
 if __name__ == "__main__":
     # 💡 Update this to your own file path
     model_path = "models/best.pt"
-    image_path = r"D:\Codes\Miniproj\detect.jpg"   # 🔹 your image path here
+    image_path = r"D:/Codes/Miniproj/lic2.png"   # 🔹 your image path here
 
     detect_single_image(model_path, image_path)

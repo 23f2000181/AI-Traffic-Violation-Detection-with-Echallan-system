@@ -429,29 +429,12 @@ class CentralDetectionManager:
                 cv2.putText(annotated_image, text, (int(x1), int(y1-10)), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
         
-        # Helmet Detection
+        # Helmet Detection - FIXED: Properly distinguish between helmet and no-helmet
         if 'helmet' in detection_types:
             print("\n🛵 Processing Helmet Detection...")
-            helmet_results = self.detect_helmets(image_path, image)
+            helmet_results, helmet_violations = self.detect_helmets(image_path, image, annotated_image)
             results['helmets'] = helmet_results
-            results['helmet_violations'] = getattr(self, 'helmet_violations_cache', [])
-    
-            # Annotate helmet detections on image
-            for helmet in helmet_results:
-                bbox = helmet.get('bbox')
-                class_name = helmet.get('class', '')
-                confidence = helmet.get('confidence', 0.0)
-        
-                if bbox and len(bbox) == 4:
-                    x1, y1, x2, y2 = bbox
-                    # Use red for violations, green for proper helmets
-                    color = (0, 0, 255) if class_name.lower() in ["nohelmet", "without_helmet", "no_helmet"] else (0, 255, 0)
-                    thickness = 3 if class_name.lower() in ["nohelmet", "without_helmet", "no_helmet"] else 2
-            
-                    cv2.rectangle(annotated_image, (int(x1), int(y1)), (int(x2), int(y2)), color, thickness)
-                    label = f"{class_name} {confidence:.2f}"
-                    cv2.putText(annotated_image, label, (int(x1), int(y1-10)), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+            results['helmet_violations'] = helmet_violations
         
         # Triple Riding Detection - USING BALANCED LOGIC
         if 'triple_riding' in detection_types:
@@ -514,8 +497,8 @@ class CentralDetectionManager:
             print(f"❌ License plate detection error: {e}")
             return []
     
-    def detect_helmets(self, image_path, image):
-        """Detect helmets using the actual helmet detection module with custom logic"""
+    def detect_helmets(self, image_path, image, annotated_image):
+        """Detect helmets and properly distinguish between helmet (no violation) and no-helmet (violation)"""
         try:
             print(f"🔍 [HELMET] Calling actual detect_helmets function...")
         
@@ -528,42 +511,58 @@ class CentralDetectionManager:
         
             print(f"🔍 [HELMET] Raw results from detect_helmets: {results}")
         
-            # Return ALL detections for drawing, but also identify violations
+            # Separate all detections and violations
             all_detections = []
             helmet_violations = []
         
             if results:
                 for detection in results:
                     class_name = detection.get('class', '').lower()
+                    confidence = detection.get('confidence', 0.0)
+                    bbox = detection.get('bbox', [])
                 
-                    # Add to all detections for drawing
+                    # Add to all detections
                     all_detections.append(detection)
                 
-                    # Use YOUR custom logic from detect_helmet.py
+                    # FIXED: Only mark as violation if it's "nohelmet", "without_helmet", or "no_helmet"
                     if class_name in ["nohelmet", "without_helmet", "no_helmet"]:
-                        print(f"🚨 HELMET VIOLATION DETECTED: {class_name}")
-                        helmet_violations.append({
+                        print(f"🚨 HELMET VIOLATION DETECTED: {class_name} (confidence: {confidence:.2f})")
+                        violation_data = {
                             'class': detection.get('class', 'no_helmet'),
-                            'confidence': detection.get('confidence', 0.0),
-                            'bbox': detection.get('bbox', []),
+                            'confidence': confidence,
+                            'bbox': bbox,
                             'type': 'helmet_violation',
                             'timestamp': datetime.now().isoformat()
-                        })
+                        }
+                        helmet_violations.append(violation_data)
+                        
+                        # Draw violation with RED bounding box
+                        if bbox and len(bbox) == 4:
+                            x1, y1, x2, y2 = bbox
+                            cv2.rectangle(annotated_image, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 3)
+                            label = f"NO HELMET {confidence:.2f}"
+                            cv2.putText(annotated_image, label, (int(x1), int(y1-10)), 
+                                      cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                    
+                    # FIXED: For proper helmet detection (no violation), draw with GREEN bounding box
                     elif class_name == "helmet":
-                        print(f"✅ Helmet detected (no violation): {class_name}")
-        
+                        print(f"✅ Helmet detected (no violation): {class_name} (confidence: {confidence:.2f})")
+                        if bbox and len(bbox) == 4:
+                            x1, y1, x2, y2 = bbox
+                            cv2.rectangle(annotated_image, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                            label = f"HELMET {confidence:.2f}"
+                            cv2.putText(annotated_image, label, (int(x1), int(y1-10)), 
+                                      cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
             print(f"✅ [HELMET] Found {len(all_detections)} total detections, {len(helmet_violations)} violations")
         
-            # Store violations separately for the results
-            self.helmet_violations_cache = helmet_violations
-        
-            return all_detections  # Return all for drawing
+            return all_detections, helmet_violations
         
         except Exception as e:
             print(f"❌ [HELMET] Error in helmet detection: {e}")
             import traceback
             traceback.print_exc()
-            return []
+            return [], []
     
     def detect_triple_riding_balanced(self, image, annotated_image):
         """Detect triple riding violations using balanced approach"""
@@ -700,7 +699,6 @@ class CentralDetectionManager:
         except Exception as e:
             print(f"❌ Red light violation detection error: {e}")
             return []
-    
     def combine_results(self, results, timestamp):
         """Combine results from all detection systems - ensure JSON serializable"""
         # Helper function to make sure all data is JSON serializable
@@ -717,17 +715,33 @@ class CentralDetectionManager:
                 return [make_json_serializable(item) for item in obj]
             else:
                 return obj
-        
+    
+        # Get helmet detections and violations
+        helmet_detections = results.get('helmets', [])
+        helmet_violations = results.get('helmet_violations', [])
+    
+        # Filter helmet detections to only include actual violations for the violations list
+        actual_helmet_violations = []
+        for detection in helmet_detections:
+            class_name = detection.get('class', '').lower()
+            if class_name in ["nohelmet", "without_helmet", "no_helmet"]:
+                actual_helmet_violations.append(detection)
+    
+        # Use the actual violations if available, otherwise use filtered ones
+        final_helmet_violations = helmet_violations if helmet_violations else actual_helmet_violations
+    
         combined = {
             "timestamp": timestamp,
             "license_plates": make_json_serializable(results.get('license_plates', [])),
-            "helmet_violations": make_json_serializable(results.get('helmets', [])),
+            "helmet_detections": make_json_serializable(helmet_detections),  # All helmet detections
+            "helmet_violations": make_json_serializable(final_helmet_violations),  # Only actual violations
             "triple_riding_violations": make_json_serializable(results.get('triple_riding_violations', [])),
             "red_light_violations": make_json_serializable(results.get('red_light_violations', [])),
             "preprocessing_applied": self.config["preprocessing"]["apply_binary_preprocessing"],
             "summary": {
                 "total_license_plates": len(results.get('license_plates', [])),
-                "total_helmet_violations": len(results.get('helmets', [])),
+                "total_helmet_detections": len(helmet_detections),
+                "total_helmet_violations": len(final_helmet_violations),
                 "total_triple_riding_violations": len(results.get('triple_riding_violations', [])),
                 "total_red_light_violations": len(results.get('red_light_violations', []))
             }
@@ -800,6 +814,7 @@ def main():
             print("📊 DETECTION SUMMARY")
             print("="*50)
             print(f"License Plates Found: {results['summary']['total_license_plates']}")
+            print(f"Helmet Detections: {results['summary']['total_helmet_detections']}")
             print(f"Helmet Violations: {results['summary']['total_helmet_violations']}")
             print(f"Triple Riding Violations: {results['summary']['total_triple_riding_violations']}")
             print(f"Red Light Violations: {results['summary']['total_red_light_violations']}")
